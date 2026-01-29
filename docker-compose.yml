@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: terra-canada-api
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # IMPORTANTE: Configura estas variables según tu entorno
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+    env_file:
+      - .env
+    networks:
+      - terra-network
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+networks:
+  terra-network:
+    driver: bridge
+
+# ================================
+# NOTAS IMPORTANTES:
+# ================================
+# 1. Crea un archivo .env en la raíz con tus variables reales
+# 2. NUNCA subas el .env al repositorio
+# 3. Para producción, considera usar secrets de Docker Swarm o Kubernetes
+# 4. La base de datos debe estar accesible desde el contenedor
