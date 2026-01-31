@@ -2,44 +2,83 @@ import { query } from '../config/database';
 import logger from '../config/logger';
 
 export class EventosService {
-  async getEventos(filters?: { tabla?: string; tipo_evento?: string; usuario_id?: number; fecha_desde?: string; fecha_hasta?: string; limit?: number }) {
+  /**
+   * Obtener eventos usando la función eventos_get de PostgreSQL
+   * @param filters - Filtros opcionales (actualmente solo se usa limit y offset)
+   * @param id - ID del evento específico (opcional)
+   */
+  async getEventos(filters?: { 
+    tabla?: string; 
+    tipo_evento?: string; 
+    usuario_id?: number; 
+    fecha_desde?: string; 
+    fecha_hasta?: string; 
+    limit?: number;
+    offset?: number;
+  }, id?: number) {
     try {
-      let sql = `SELECT e.*, u.nombre_usuario
-                 FROM eventos e
-                 LEFT JOIN usuarios u ON e.usuario_id = u.id
-                 WHERE 1=1`;
+      const limite = filters?.limit || 100;
+      const offset = filters?.offset || 0;
       
-      const params: any[] = [];
-      let paramCount = 1;
-
-      if (filters?.tabla) {
-        sql += ` AND e.tabla = $${paramCount++}`;
-        params.push(filters.tabla);
-      }
-      if (filters?.tipo_evento) {
-        sql += ` AND e.tipo_evento = $${paramCount++}`;
-        params.push(filters.tipo_evento);
-      }
-      if (filters?.usuario_id) {
-        sql += ` AND e.usuario_id = $${paramCount++}`;
-        params.push(filters.usuario_id);
-      }
-      if (filters?.fecha_desde) {
-        sql += ` AND e.fecha_creacion >= $${paramCount++}`;
-        params.push(filters.fecha_desde);
-      }
-      if (filters?.fecha_hasta) {
-        sql += ` AND e.fecha_creacion <= $${paramCount++}`;
-        params.push(filters.fecha_hasta);
-      }
-
-      sql += ` ORDER BY e.fecha_creacion DESC LIMIT $${paramCount}`;
-      params.push(filters?.limit || 100);
+      // Llamar a la función eventos_get de PostgreSQL
+      const sql = 'SELECT eventos_get($1, $2, $3) as result';
+      const params = [
+        id || null,
+        limite,
+        offset
+      ];
 
       const result = await query(sql, params);
-      return result.rows;
+      
+      if (result.rows.length > 0 && result.rows[0].result) {
+        const response = result.rows[0].result;
+        
+        // Si la función retorna un error, lanzarlo
+        if (!response.estado) {
+          throw new Error(response.message);
+        }
+        
+        // Retornar los datos
+        return response;
+      }
+      
+      return {
+        code: 200,
+        estado: true,
+        message: 'No se encontraron eventos',
+        data: [],
+        total: 0
+      };
     } catch (error) {
       logger.error('Error al obtener eventos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener un evento específico por ID
+   * @param id - ID del evento
+   */
+  async getEventoById(id: number) {
+    try {
+      const sql = 'SELECT eventos_get($1, $2, $3) as result';
+      const params = [id, 100, 0];
+
+      const result = await query(sql, params);
+      
+      if (result.rows.length > 0 && result.rows[0].result) {
+        const response = result.rows[0].result;
+        
+        if (!response.estado) {
+          return null;
+        }
+        
+        return response.data;
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error('Error al obtener evento por ID:', error);
       throw error;
     }
   }

@@ -1,0 +1,277 @@
+{
+    "info": {
+        "name": "API Terra Canada - Endpoints Completos Faltantes",
+        "description": "Todos los endpoints faltantes para completar la colección al 100%. Incluye Pagos, Roles, Documentos, Correos y Auth.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_postman_id": "terra-canada-endpoints-faltantes",
+        "version": "1.0.0"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:3000/api/v1",
+            "type": "string"
+        },
+        {
+            "key": "jwt_token",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "AUTH - Correcciones",
+            "item": [
+                {
+                    "name": "Get Current User (ME)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/auth/me",
+                            "host": ["{{base_url}}"],
+                            "path": ["auth", "me"]
+                        },
+                        "description": "Obtener información del usuario autenticado. CORRECCIÓN: Ruta correcta es /auth/me (no /auth/profile)"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "ROLES - Endpoints Faltantes",
+            "item": [
+                {
+                    "name": "Crear Rol",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"nombre\": \"CONTADOR\",\n  \"descripcion\": \"Rol para contadores del sistema\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/roles",
+                            "host": ["{{base_url}}"],
+                            "path": ["roles"]
+                        },
+                        "description": "Crear un nuevo rol en el sistema. Solo ADMIN."
+                    }
+                },
+                {
+                    "name": "Actualizar Rol",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"nombre\": \"CONTADOR_SENIOR\",\n  \"descripcion\": \"Rol para contadores senior con más permisos\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/roles/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["roles", "1"]
+                        },
+                        "description": "Actualizar un rol existente. Solo ADMIN."
+                    }
+                },
+                {
+                    "name": "Eliminar Rol",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/roles/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["roles", "1"]
+                        },
+                        "description": "Eliminar un rol del sistema. Solo ADMIN. No se puede eliminar si hay usuarios con este rol."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "PAGOS - Webhooks N8N",
+            "item": [
+                {
+                    "name": "Desactivar Pago",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/pagos/1/desactivar",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "1", "desactivar"]
+                        },
+                        "description": "Desactiva un pago (soft delete). El pago no se elimina, solo se marca como inactivo."
+                    }
+                },
+                {
+                    "name": "Activar Pago",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/pagos/1/activar",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "1", "activar"]
+                        },
+                        "description": "Reactiva un pago previamente desactivado."
+                    }
+                },
+                {
+                    "name": "Enviar Documento de Estado (N8N)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"pdf\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9iag...\",\n  \"id_pago\": 10,\n  \"usuario_id\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/pagos/documento-estado",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "documento-estado"]
+                        },
+                        "description": "Envía documento de estado de pago a N8N. Webhook: https://n8n.salazargroup.cloud/webhook/documento_pago. Incluye usuario_id para trazabilidad."
+                    }
+                },
+                {
+                    "name": "Subir Facturas (N8N)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"usuario_id\": 2,\n  \"facturas\": [\n    {\n      \"pdf\": \"JVBERi0xLjQKJeLjz9MK...\",\n      \"proveedor_id\": 1\n    },\n    {\n      \"pdf\": \"JVBERi0xLjQKJeLjz9MK...\",\n      \"proveedor_id\": 2\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/pagos/subir-facturas",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "subir-facturas"]
+                        },
+                        "description": "Sube hasta 3 facturas a N8N para procesamiento. Webhook: https://n8n.salazargroup.cloud/webhook/docu. Incluye usuario_id."
+                    }
+                },
+                {
+                    "name": "Subir Extracto de Banco (N8N)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"pdf\": \"JVBERi0xLjQKJeLjz9MK...\",\n  \"usuario_id\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/pagos/subir-extracto-banco",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "subir-extracto-banco"]
+                        },
+                        "description": "Sube extracto bancario a N8N para procesamiento. Webhook: https://n8n.salazargroup.cloud/webhook/docu. Incluye usuario_id."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "DOCUMENTOS - Endpoints Faltantes",
+            "item": [
+                {
+                    "name": "Actualizar Documento",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"nombre_archivo\": \"factura_corregida.pdf\",\n  \"url_documento\": \"https://storage.terracanada.com/nueva_url/factura.pdf\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documentos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos", "1"]
+                        },
+                        "description": "Actualizar nombre o URL de un documento existente. Solo se actualizan los campos proporcionados."
+                    }
+                },
+                {
+                    "name": "Crear Documento (JSON - Corregido)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tipo_documento\": \"FACTURA\",\n  \"nombre_archivo\": \"factura_RES-2026-001.pdf\",\n  \"url_documento\": \"https://storage.terracanada.com/facturas/factura.pdf\",\n  \"usuario_id\": 2,\n  \"pago_id\": 10\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documentos",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos"]
+                        },
+                        "description": "Crear nuevo documento con JSON (no formdata). Tipos: FACTURA, DOCUMENTO_BANCO. CORRECCIÓN: Usar JSON en lugar de formdata."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "CORREOS - Endpoints Faltantes",
+            "item": [
+                {
+                    "name": "Obtener Correos Pendientes",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/correos/pendientes",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "pendientes"]
+                        },
+                        "description": "Obtener solo correos en estado BORRADOR (pendientes de envío)."
+                    }
+                }
+            ]
+        }
+    ]
+}

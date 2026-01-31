@@ -1,0 +1,94 @@
+[
+    {
+        "name": "Desactivar Pago",
+        "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/pagos/1/desactivar",
+                "host": ["{{base_url}}"],
+                "path": ["pagos", "1", "desactivar"]
+            },
+            "description": "Desactiva un pago (soft delete). El pago no se elimina, solo se marca como inactivo."
+        }
+    },
+    {
+        "name": "Activar Pago",
+        "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/pagos/1/activar",
+                "host": ["{{base_url}}"],
+                "path": ["pagos", "1", "activar"]
+            },
+            "description": "Reactiva un pago previamente desactivado."
+        }
+    },
+    {
+        "name": "Enviar Documento de Estado (N8N)",
+        "request": {
+            "method": "POST",
+            "header": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                }
+            ],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pdf\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9iag...\",\n  \"id_pago\": 10,\n  \"usuario_id\": 2\n}"
+            },
+            "url": {
+                "raw": "{{base_url}}/pagos/documento-estado",
+                "host": ["{{base_url}}"],
+                "path": ["pagos", "documento-estado"]
+            },
+            "description": "Envía documento de estado de pago a N8N. Webhook: https://n8n.salazargroup.cloud/webhook/documento_pago. Incluye usuario_id para trazabilidad."
+        }
+    },
+    {
+        "name": "Subir Facturas (N8N)",
+        "request": {
+            "method": "POST",
+            "header": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                }
+            ],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n  \"usuario_id\": 2,\n  \"facturas\": [\n    {\n      \"pdf\": \"JVBERi0xLjQKJeLjz9MK...\",\n      \"proveedor_id\": 1\n    },\n    {\n      \"pdf\": \"JVBERi0xLjQKJeLjz9MK...\",\n      \"proveedor_id\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+                "raw": "{{base_url}}/pagos/subir-facturas",
+                "host": ["{{base_url}}"],
+                "path": ["pagos", "subir-facturas"]
+            },
+            "description": "Sube hasta 3 facturas a N8N para procesamiento. Webhook: https://n8n.salazargroup.cloud/webhook/docu. Incluye usuario_id."
+        }
+    },
+    {
+        "name": "Subir Extracto de Banco (N8N)",
+        "request": {
+            "method": "POST",
+            "header": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                }
+            ],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pdf\": \"JVBERi0xLjQKJeLjz9MK...\",\n  \"usuario_id\": 2\n}"
+            },
+            "url": {
+                "raw": "{{base_url}}/pagos/subir-extracto-banco",
+                "host": ["{{base_url}}"],
+                "path": ["pagos", "subir-extracto-banco"]
+            },
+            "description": "Sube extracto bancario a N8N para procesamiento. Webhook: https://n8n.salazargroup.cloud/webhook/docu. Incluye usuario_id."
+        }
+    }
+]
