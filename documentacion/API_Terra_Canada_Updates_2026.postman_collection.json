@@ -1,0 +1,349 @@
+{
+    "info": {
+        "name": "API Terra Canada - Endpoints Actualizados 2026",
+        "description": "Endpoints nuevos y actualizados: Documentos, Correos con usuario_id, y Webhooks de Pagos",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_postman_id": "terra-canada-api-updates-2026",
+        "version": "2.0.0"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:3000/api/v1",
+            "type": "string"
+        },
+        {
+            "key": "jwt_token",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Documentos",
+            "item": [
+                {
+                    "name": "Listar Documentos",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/documentos",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos"]
+                        },
+                        "description": "Obtener todos los documentos con información del usuario y pagos vinculados"
+                    }
+                },
+                {
+                    "name": "Obtener Documento por ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/documentos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos", "1"]
+                        },
+                        "description": "Obtener documento específico con pagos vinculados"
+                    }
+                },
+                {
+                    "name": "Crear Documento",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tipo_documento\": \"FACTURA\",\n  \"nombre_archivo\": \"factura_RES-2026-001.pdf\",\n  \"url_documento\": \"https://storage.terracanada.com/facturas/factura.pdf\",\n  \"usuario_id\": 2,\n  \"pago_id\": 10\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documentos",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos"]
+                        },
+                        "description": "Crear nuevo documento. Tipos: FACTURA, DOCUMENTO_BANCO"
+                    }
+                },
+                {
+                    "name": "Actualizar Documento",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"nombre_archivo\": \"factura_corregida.pdf\",\n  \"url_documento\": \"https://storage.terracanada.com/nueva_url/factura.pdf\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documentos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos", "1"]
+                        },
+                        "description": "Actualizar nombre o URL del documento"
+                    }
+                },
+                {
+                    "name": "Eliminar Documento",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/documentos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["documentos", "1"]
+                        },
+                        "description": "Eliminar documento (no se puede si tiene pagos verificados)"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Correos",
+            "item": [
+                {
+                    "name": "Listar Correos",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/correos?estado=BORRADOR",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos"],
+                            "query": [
+                                {
+                                    "key": "estado",
+                                    "value": "BORRADOR",
+                                    "description": "BORRADOR o ENVIADO"
+                                },
+                                {
+                                    "key": "proveedor_id",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Obtener correos con filtros opcionales"
+                    }
+                },
+                {
+                    "name": "Obtener Correos Pendientes",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/correos/pendientes",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "pendientes"]
+                        },
+                        "description": "Obtener solo correos en estado BORRADOR"
+                    }
+                },
+                {
+                    "name": "Obtener Correo por ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/correos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "1"]
+                        },
+                        "description": "Obtener correo con detalles completos"
+                    }
+                },
+                {
+                    "name": "Generar Correos Automáticamente",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"proveedor_id\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/correos/generar",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "generar"]
+                        },
+                        "description": "Generar correos para pagos pendientes (pagado=TRUE, gmail_enviado=FALSE)"
+                    }
+                },
+                {
+                    "name": "Crear Correo Manualmente",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"proveedor_id\": 1,\n  \"correo_seleccionado\": \"billing@proveedor.com\",\n  \"asunto\": \"Notificación de Pagos - Enero 2026\",\n  \"cuerpo\": \"Estimado proveedor,\\n\\nLe notificamos los siguientes pagos...\",\n  \"pago_ids\": [1, 2, 3]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/correos",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos"]
+                        },
+                        "description": "Crear correo seleccionando manualmente los pagos"
+                    }
+                },
+                {
+                    "name": "Actualizar Borrador de Correo",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"asunto\": \"Nuevo asunto actualizado\",\n  \"cuerpo\": \"Nuevo cuerpo del correo\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/correos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "1"]
+                        },
+                        "description": "Actualizar correo en estado BORRADOR"
+                    }
+                },
+                {
+                    "name": "Enviar Correo (con usuario_id)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"asunto\": \"Edición de último momento (opcional)\",\n  \"cuerpo\": \"Edición de último momento (opcional)\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/correos/1/enviar",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "1", "enviar"]
+                        },
+                        "description": "Enviar correo vía N8N (Gmail). Webhook: https://n8n.salazargroup.cloud/webhook/gmail_g. Incluye usuario_id automáticamente del correo."
+                    }
+                },
+                {
+                    "name": "Eliminar Borrador de Correo",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/correos/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["correos", "1"]
+                        },
+                        "description": "Eliminar correo en estado BORRADOR"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Pagos - Webhooks N8N",
+            "item": [
+                {
+                    "name": "Enviar Documento de Estado (con usuario_id)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"pdf\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9iag...\",\n  \"id_pago\": 10,\n  \"usuario_id\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/pagos/documento-estado",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "documento-estado"]
+                        },
+                        "description": "Enviar documento de estado de pago a N8N. Webhook: https://n8n.salazargroup.cloud/webhook/documento_pago"
+                    }
+                },
+                {
+                    "name": "Subir Facturas (con usuario_id)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"usuario_id\": 2,\n  \"facturas\": [\n    {\n      \"pdf\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9iag...\",\n      \"proveedor_id\": 1\n    },\n    {\n      \"pdf\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9iag...\",\n      \"proveedor_id\": 2\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/pagos/subir-facturas",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "subir-facturas"]
+                        },
+                        "description": "Subir hasta 3 facturas a N8N. Webhook: https://n8n.salazargroup.cloud/webhook/docu"
+                    }
+                },
+                {
+                    "name": "Subir Extracto de Banco (con usuario_id)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"pdf\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9iag...\",\n  \"usuario_id\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/pagos/subir-extracto-banco",
+                            "host": ["{{base_url}}"],
+                            "path": ["pagos", "subir-extracto-banco"]
+                        },
+                        "description": "Subir extracto bancario a N8N. Webhook: https://n8n.salazargroup.cloud/webhook/docu"
+                    }
+                }
+            ]
+        }
+    ]
+}

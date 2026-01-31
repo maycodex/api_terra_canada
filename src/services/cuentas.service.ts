@@ -1,119 +1,144 @@
 import { query } from '../config/database';
 import logger from '../config/logger';
 
+// Interfaz para la respuesta de las funciones PostgreSQL
+interface PostgreSQLResponse {
+  code: number;
+  estado: boolean;
+  message: string;
+  data: any;
+}
+
 export class CuentasService {
-  async getCuentas(id?: number, clienteId?: number) {
+  /**
+   * GET: Obtener todas las cuentas o una específica
+   * Usa la función PostgreSQL: cuentas_bancarias_get(p_id)
+   */
+  async getCuentas(id?: number) {
     try {
+      let result;
+      
       if (id) {
-        const result = await query(
-          `SELECT cb.*, c.nombre as cliente_nombre
-           FROM cuentas_bancarias cb
-           LEFT JOIN clientes c ON cb.cliente_id = c.id
-           WHERE cb.id = $1`,
-          [id]
-        );
-        return result.rows[0] || null;
+        // Obtener una cuenta específica
+        result = await query('SELECT cuentas_bancarias_get($1) as response', [id]);
+      } else {
+        // Obtener todas las cuentas
+        result = await query('SELECT cuentas_bancarias_get() as response');
       }
 
-      let sql = `SELECT cb.*, c.nombre as cliente_nombre
-                 FROM cuentas_bancarias cb
-                 LEFT JOIN clientes c ON cb.cliente_id = c.id
-                 WHERE cb.activo = true`;
-      const params: any[] = [];
-
-      if (clienteId) {
-        sql += ` AND cb.cliente_id = $1`;
-        params.push(clienteId);
+      const response: PostgreSQLResponse = result.rows[0].response;
+      
+      // Si hubo error en la función PostgreSQL, lanzar excepción
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      sql += ` ORDER BY cb.nombre_banco ASC`;
-      const result = await query(sql, params);
-      return result.rows;
-    } catch (error) {
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al obtener cuentas:', error);
       throw error;
     }
   }
 
+  /**
+   * POST: Crear una nueva cuenta bancaria
+   * Usa la función PostgreSQL: cuentas_bancarias_post(...)
+   */
   async createCuenta(data: {
-    numero_cuenta_encriptado: string;
     nombre_banco: string;
-    tipo_cuenta: string;
-    titular: string;
-    cliente_id: number;
+    nombre_cuenta: string;
+    ultimos_4_digitos: string;
+    moneda: 'USD' | 'CAD';
     activo?: boolean;
   }) {
     try {
-      const cliente = await query('SELECT id FROM clientes WHERE id = $1', [data.cliente_id]);
-      if (cliente.rows.length === 0) throw new Error('Cliente no encontrado');
-
       const result = await query(
-        `INSERT INTO cuentas_bancarias (numero_cuenta_encriptado, nombre_banco, tipo_cuenta, titular, cliente_id, activo)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [data.numero_cuenta_encriptado, data.nombre_banco, data.tipo_cuenta, data.titular, data.cliente_id, data.activo !== false]
+        `SELECT cuentas_bancarias_post($1, $2, $3, $4::tipo_moneda, $5) as response`,
+        [
+          data.nombre_banco,
+          data.nombre_cuenta,
+          data.ultimos_4_digitos,
+          data.moneda,
+          data.activo !== false
+        ]
       );
 
-      logger.info(`Cuenta bancaria creada: ${result.rows[0].nombre_banco} - ${result.rows[0].titular}`);
-      return await this.getCuentas(result.rows[0].id);
-    } catch (error) {
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
+      }
+
+      logger.info(`Cuenta bancaria creada: ${data.nombre_banco} - ${data.nombre_cuenta}`);
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al crear cuenta:', error);
       throw error;
     }
   }
 
+  /**
+   * PUT: Actualizar una cuenta bancaria existente
+   * Usa la función PostgreSQL: cuentas_bancarias_put(...)
+   */
   async updateCuenta(id: number, data: {
     nombre_banco?: string;
-    tipo_cuenta?: string;
-    titular?: string;
-    cliente_id?: number;
+    nombre_cuenta?: string;
     activo?: boolean;
   }) {
     try {
-      const existing = await query('SELECT * FROM cuentas_bancarias WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Cuenta no encontrada');
+      const result = await query(
+        `SELECT cuentas_bancarias_put($1, $2, $3, $4) as response`,
+        [
+          id,
+          data.nombre_banco || null,
+          data.nombre_cuenta || null,
+          data.activo !== undefined ? data.activo : null
+        ]
+      );
 
-      if (data.cliente_id) {
-        const cliente = await query('SELECT id FROM clientes WHERE id = $1', [data.cliente_id]);
-        if (cliente.rows.length === 0) throw new Error('Cliente no encontrado');
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      const updates: string[] = [];
-      const values: any[] = [];
-      let paramCount = 1;
-
-      if (data.nombre_banco !== undefined) { updates.push(`nombre_banco = $${paramCount++}`); values.push(data.nombre_banco); }
-      if (data.tipo_cuenta !== undefined) { updates.push(`tipo_cuenta = $${paramCount++}`); values.push(data.tipo_cuenta); }
-      if (data.titular !== undefined) { updates.push(`titular = $${paramCount++}`); values.push(data.titular); }
-      if (data.cliente_id !== undefined) { updates.push(`cliente_id = $${paramCount++}`); values.push(data.cliente_id); }
-      if (data.activo !== undefined) { updates.push(`activo = ${paramCount++}`); values.push(data.activo); }
-
-      if (updates.length === 0) return existing.rows[0];
-
-      values.push(id);
-      await query(`UPDATE cuentas_bancarias SET ${updates.join(', ')} WHERE id = $${paramCount}`, values);
-
-      logger.info(`Cuenta actualizada: ${data.nombre_banco || existing.rows[0].nombre_banco}`);
-      return await this.getCuentas(id);
-    } catch (error) {
+      logger.info(`Cuenta bancaria actualizada: ${data.nombre_banco || 'ID ' + id}`);
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al actualizar cuenta:', error);
       throw error;
     }
   }
 
+  /**
+   * DELETE: Eliminar una cuenta bancaria (soft delete)
+   * Usa la función PostgreSQL: cuentas_bancarias_delete(p_id)
+   */
   async deleteCuenta(id: number) {
     try {
-      const existing = await query('SELECT * FROM cuentas_bancarias WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Cuenta no encontrada');
+      const result = await query(
+        'SELECT cuentas_bancarias_delete($1) as response',
+        [id]
+      );
 
-      const pagosCount = await query('SELECT COUNT(*) as count FROM pagos WHERE cuenta_id = $1', [id]);
-      if (parseInt(pagosCount.rows[0].count) > 0) {
-        throw new Error('No se puede eliminar la cuenta porque tiene pagos asociados');
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      await query('UPDATE cuentas_bancarias SET activo = false WHERE id = $1', [id]);
-      logger.info(`Cuenta desactivada: ${existing.rows[0].nombre_banco}`);
-      return existing.rows[0];
-    } catch (error) {
+      logger.info(`Cuenta bancaria eliminada: ${response.data?.nombre_banco} (${response.data?.nombre_cuenta})`);
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al eliminar cuenta:', error);
       throw error;
     }

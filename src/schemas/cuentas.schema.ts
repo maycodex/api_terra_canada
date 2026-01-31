@@ -1,19 +1,17 @@
 import { z } from 'zod';
 
+// Schema basado en las funciones PostgreSQL cuentas_bancarias_*
 export const createCuentaSchema = z.object({
-  numero_cuenta_encriptado: z.string().min(1),
   nombre_banco: z.string().min(1).max(100),
-  tipo_cuenta: z.enum(['AHORROS', 'CORRIENTE', 'OTRO']),
-  titular: z.string().min(1).max(100),
-  cliente_id: z.number().int().positive(),
+  nombre_cuenta: z.string().min(1).max(100),
+  ultimos_4_digitos: z.string().length(4).regex(/^\d{4}$/, 'Deben ser exactamente 4 dígitos numéricos'),
+  moneda: z.enum(['USD', 'CAD']),
   activo: z.boolean().default(true).optional()
 });
 
 export const updateCuentaSchema = z.object({
   nombre_banco: z.string().min(1).max(100).optional(),
-  tipo_cuenta: z.enum(['AHORROS', 'CORRIENTE', 'OTRO']).optional(),
-  titular: z.string().min(1).max(100).optional(),
-  cliente_id: z.number().int().positive().optional(),
+  nombre_cuenta: z.string().min(1).max(100).optional(),
   activo: z.boolean().optional()
 });
 

@@ -1,160 +1,148 @@
 import { query } from '../config/database';
 import logger from '../config/logger';
 
+// Interfaz para la respuesta de las funciones PostgreSQL
+interface PostgreSQLResponse {
+  code: number;
+  estado: boolean;
+  message: string;
+  data: any;
+}
+
 export class TarjetasService {
-  async getTarjetas(id?: number, clienteId?: number) {
+  /**
+   * GET: Obtener todas las tarjetas o una específica
+   * Usa la función PostgreSQL: tarjetas_credito_get(p_id)
+   */
+  async getTarjetas(id?: number) {
     try {
+      let result;
+      
       if (id) {
-        const result = await query(
-          `SELECT t.*, c.nombre as cliente_nombre
-           FROM tarjetas_credito t
-           LEFT JOIN clientes c ON t.cliente_id = c.id
-           WHERE t.id = $1`,
-          [id]
-        );
-        return result.rows[0] || null;
+        // Obtener una tarjeta específica
+        result = await query('SELECT tarjetas_credito_get($1) as response', [id]);
+      } else {
+        // Obtener todas las tarjetas
+        result = await query('SELECT tarjetas_credito_get() as response');
       }
 
-      let sql = `SELECT t.*, c.nombre as cliente_nombre
-                 FROM tarjetas_credito t
-                 LEFT JOIN clientes c ON t.cliente_id = c.id
-                 WHERE t.activo = true`;
-      const params: any[] = [];
-
-      if (clienteId) {
-        sql += ` AND t.cliente_id = $1`;
-        params.push(clienteId);
+      const response: PostgreSQLResponse = result.rows[0].response;
+      
+      // Si hubo error en la función PostgreSQL, lanzar excepción
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      sql += ` ORDER BY t.titular ASC`;
-      const result = await query(sql, params);
-      return result.rows;
-    } catch (error) {
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al obtener tarjetas:', error);
       throw error;
     }
   }
 
+  /**
+   * POST: Crear una nueva tarjeta
+   * Usa la función PostgreSQL: tarjetas_credito_post(...)
+   */
   async createTarjeta(data: {
-    numero_tarjeta_encriptado: string;
-    titular: string;
-    tipo: string;
-    saldo_asignado: number;
-    saldo_disponible?: number;
-    cliente_id: number;
-    fecha_vencimiento?: string | null;
+    nombre_titular: string;
+    ultimos_4_digitos: string;
+    moneda: 'USD' | 'CAD';
+    limite_mensual: number;
+    tipo_tarjeta?: string;
     activo?: boolean;
   }) {
     try {
-      // Verificar que el cliente existe
-      const cliente = await query('SELECT id FROM clientes WHERE id = $1', [data.cliente_id]);
-      if (cliente.rows.length === 0) throw new Error('Cliente no encontrado');
-
-      const saldoDisponible = data.saldo_disponible !== undefined ? data.saldo_disponible : data.saldo_asignado;
-
       const result = await query(
-        `INSERT INTO tarjetas_credito (numero_tarjeta_encriptado, titular, tipo, saldo_asignado, 
-                                       saldo_disponible, cliente_id, fecha_vencimiento, activo)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [data.numero_tarjeta_encriptado, data.titular, data.tipo, data.saldo_asignado,
-         saldoDisponible, data.cliente_id, data.fecha_vencimiento || null, data.activo !== false]
+        `SELECT tarjetas_credito_post($1, $2, $3::tipo_moneda, $4, $5, $6) as response`,
+        [
+          data.nombre_titular,
+          data.ultimos_4_digitos,
+          data.moneda,
+          data.limite_mensual,
+          data.tipo_tarjeta || 'Visa',
+          data.activo !== false
+        ]
       );
 
-      logger.info(`Tarjeta creada: ${result.rows[0].titular} - Saldo: ${result.rows[0].saldo_asignado}`);
-      return await this.getTarjetas(result.rows[0].id);
-    } catch (error) {
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
+      }
+
+      logger.info(`Tarjeta creada: ${data.nombre_titular} - Límite: ${data.limite_mensual} ${data.moneda}`);
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al crear tarjeta:', error);
       throw error;
     }
   }
 
+  /**
+   * PUT: Actualizar una tarjeta existente
+   * Usa la función PostgreSQL: tarjetas_credito_put(...)
+   */
   async updateTarjeta(id: number, data: {
-    titular?: string;
-    tipo?: string;
-    saldo_asignado?: number;
-    cliente_id?: number;
-    fecha_vencimiento?: string | null;
+    nombre_titular?: string;
+    limite_mensual?: number;
+    tipo_tarjeta?: string;
     activo?: boolean;
   }) {
     try {
-      const existing = await query('SELECT * FROM tarjetas_credito WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Tarjeta no encontrada');
+      const result = await query(
+        `SELECT tarjetas_credito_put($1, $2, $3, $4, $5) as response`,
+        [
+          id,
+          data.nombre_titular || null,
+          data.limite_mensual || null,
+          data.tipo_tarjeta || null,
+          data.activo !== undefined ? data.activo : null
+        ]
+      );
 
-      if (data.cliente_id) {
-        const cliente = await query('SELECT id FROM clientes WHERE id = $1', [data.cliente_id]);
-        if (cliente.rows.length === 0) throw new Error('Cliente no encontrado');
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      const updates: string[] = [];
-      const values: any[] = [];
-      let paramCount = 1;
-
-      if (data.titular !== undefined) { updates.push(`titular = $${paramCount++}`); values.push(data.titular); }
-      if (data.tipo !== undefined) { updates.push(`tipo = $${paramCount++}`); values.push(data.tipo); }
-      if (data.saldo_asignado !== undefined) {
-        updates.push(`saldo_asignado = $${paramCount++}`);
-        values.push(data.saldo_asignado);
-        // Ajustar también el saldo disponible proporcionalmente
-        const diff = data.saldo_asignado - existing.rows[0].saldo_asignado;
-        updates.push(`saldo_disponible = saldo_disponible + $${paramCount++}`);
-        values.push(diff);
-      }
-      if (data.cliente_id !== undefined) { updates.push(`cliente_id = $${paramCount++}`); values.push(data.cliente_id); }
-      if (data.fecha_vencimiento !== undefined) { updates.push(`fecha_vencimiento = $${paramCount++}`); values.push(data.fecha_vencimiento); }
-      if (data.activo !== undefined) { updates.push(`activo = $${paramCount++}`); values.push(data.activo); }
-
-      if (updates.length === 0) return existing.rows[0];
-
-      values.push(id);
-      await query(`UPDATE tarjetas_credito SET ${updates.join(', ')} WHERE id = $${paramCount}`, values);
-
-      logger.info(`Tarjeta actualizada: ${data.titular || existing.rows[0].titular}`);
-      return await this.getTarjetas(id);
-    } catch (error) {
+      logger.info(`Tarjeta actualizada: ${data.nombre_titular || 'ID ' + id}`);
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al actualizar tarjeta:', error);
       throw error;
     }
   }
 
-  async recargarTarjeta(id: number, monto: number) {
-    try {
-      const existing = await query('SELECT * FROM tarjetas_credito WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Tarjeta no encontrada');
-
-      if (monto <= 0) throw new Error('El monto debe ser mayor a 0');
-
-      const result = await query(
-        `UPDATE tarjetas_credito 
-         SET saldo_asignado = saldo_asignado + $1, 
-             saldo_disponible = saldo_disponible + $1
-         WHERE id = $2
-         RETURNING *`,
-        [monto, id]
-      );
-
-      logger.info(`Tarjeta recargada: ${result.rows[0].titular} - Monto: ${monto}`);
-      return await this.getTarjetas(id);
-    } catch (error) {
-      logger.error('Error al recargar tarjeta:', error);
-      throw error;
-    }
-  }
-
+  /**
+   * DELETE: Eliminar una tarjeta (soft delete)
+   * Usa la función PostgreSQL: tarjetas_credito_delete(p_id)
+   */
   async deleteTarjeta(id: number) {
     try {
-      const existing = await query('SELECT * FROM tarjetas_credito WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Tarjeta no encontrada');
+      const result = await query(
+        'SELECT tarjetas_credito_delete($1) as response',
+        [id]
+      );
 
-      // Verificar que no tenga pagos asociados
-      const pagosCount = await query('SELECT COUNT(*) as count FROM pagos WHERE tarjeta_id = $1', [id]);
-      if (parseInt(pagosCount.rows[0].count) > 0) {
-        throw new Error('No se puede eliminar la tarjeta porque tiene pagos asociados');
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      await query('UPDATE tarjetas_credito SET activo = false WHERE id = $1', [id]);
-      logger.info(`Tarjeta desactivada: ${existing.rows[0].titular}`);
-      return existing.rows[0];
-    } catch (error) {
+      logger.info(`Tarjeta eliminada: ${response.data?.nombre_titular} (${response.data?.ultimos_4_digitos})`);
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al eliminar tarjeta:', error);
       throw error;
     }

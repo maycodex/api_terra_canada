@@ -1,22 +1,28 @@
 import { z } from 'zod';
-import { TipoMoneda, MedioPago, EstadoPago } from '../types/enums';
 
+// Schema basado en las funciones PostgreSQL pagos_*
 export const createPagoSchema = z.object({
-  monto: z.number().positive(),
-  moneda: z.nativeEnum(TipoMoneda),
-  medio_pago: z.nativeEnum(MedioPago),
   proveedor_id: z.number().int().positive(),
   usuario_id: z.number().int().positive(),
+  codigo_reserva: z.string().min(1).max(50),
+  monto: z.number().positive(),
+  moneda: z.enum(['USD', 'CAD']),
+  tipo_medio_pago: z.enum(['TARJETA', 'CUENTA_BANCARIA']),
   tarjeta_id: z.number().int().positive().optional().nullable(),
-  cuenta_id: z.number().int().positive().optional().nullable(),
-  observaciones: z.string().optional().nullable(),
-  cliente_asociado_id: z.number().int().positive().optional().nullable()
+  cuenta_bancaria_id: z.number().int().positive().optional().nullable(),
+  clientes_ids: z.array(z.number().int().positive()).optional().nullable(),
+  descripcion: z.string().optional().nullable(),
+  fecha_esperada_debito: z.string().optional().nullable() // formato: YYYY-MM-DD
 });
 
 export const updatePagoSchema = z.object({
-  estado: z.nativeEnum(EstadoPago).optional(),
-  observaciones: z.string().optional().nullable(),
-  fecha_pago: z.string().optional().nullable()
+  monto: z.number().positive().optional(),
+  descripcion: z.string().optional().nullable(),
+  fecha_esperada_debito: z.string().optional().nullable(),
+  pagado: z.boolean().optional(),
+  verificado: z.boolean().optional(),
+  gmail_enviado: z.boolean().optional(),
+  activo: z.boolean().optional()
 });
 
 export const pagoIdSchema = z.object({

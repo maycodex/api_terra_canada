@@ -1596,12 +1596,12 @@ SELECT usuarios_get(1);
 
 -- POST: Crear un nuevo usuario
 SELECT usuarios_post(
-    'jperez', 
-    'jperez@terracanada.com', 
-    'password123', 
-    'Juan Pérez', 
+    'admin', 
+    'admin@terracanada.com', 
+    'admin123', 
+    'administrador', 
     1, 
-    '+1234567890', 
+    '+1245645', 
     true
 );
 

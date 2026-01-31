@@ -8,8 +8,12 @@ import usuariosRoutes from './usuarios.routes';
 import tarjetasRoutes from './tarjetas.routes';
 import cuentasRoutes from './cuentas.routes';
 import pagosRoutes from './pagos.routes';
+import documentosRoutes from './documentos.routes';
+import facturasRoutes from './facturas.routes';
+import correosRoutes from './correos.routes';
 import eventosRoutes from './eventos.routes';
 import analisisRoutes from './analisis.routes';
+import webhooksRoutes from './webhooks.routes';
 
 const router = Router();
 
@@ -38,8 +42,12 @@ router.get('/', (_req, res) => {
       tarjetas: '/api/v1/tarjetas',
       cuentas: '/api/v1/cuentas',
       pagos: '/api/v1/pagos',
+      documentos: '/api/v1/documentos',
+      facturas: '/api/v1/facturas',
+      correos: '/api/v1/correos',
       eventos: '/api/v1/eventos',
-      analisis: '/api/v1/analisis'
+      analisis: '/api/v1/analisis',
+      webhooks: '/api/v1/webhooks'
     }
   });
 });
@@ -54,7 +62,11 @@ router.use('/usuarios', usuariosRoutes);
 router.use('/tarjetas', tarjetasRoutes);
 router.use('/cuentas', cuentasRoutes);
 router.use('/pagos', pagosRoutes);
+router.use('/documentos', documentosRoutes);
+router.use('/facturas', facturasRoutes);
+router.use('/correos', correosRoutes);
 router.use('/eventos', eventosRoutes);
 router.use('/analisis', analisisRoutes);
+router.use('/webhooks', webhooksRoutes);
 
 export default router;

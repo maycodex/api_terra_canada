@@ -1,214 +1,258 @@
-import { query, getClient } from '../config/database';
+import { query } from '../config/database';
 import logger from '../config/logger';
 
+// Interfaz para la respuesta de las funciones PostgreSQL
+interface PostgreSQLResponse {
+  code: number;
+  estado: boolean;
+  message: string;
+  data: any;
+}
+
 export class PagosService {
-  async getPagos(id?: number, filters?: { proveedor_id?: number; estado?: string; fecha_desde?: string; fecha_hasta?: string }) {
+  /**
+   * GET: Obtener todos los pagos o uno específico
+   * Usa la función PostgreSQL: pagos_get(p_id)
+   */
+  async getPagos(id?: number) {
     try {
-      if (id) {
-        const result = await query(
-          `SELECT p.*, 
-                  pr.nombre as proveedor_nombre,
-                  u.nombre_usuario as usuario_nombre,
-                  t.titular as tarjeta_titular,
-                  cb.nombre_banco as cuenta_banco,
-                  c.nombre as cliente_nombre
-           FROM pagos p
-           LEFT JOIN proveedores pr ON p.proveedor_id = pr.id
-           LEFT JOIN usuarios u ON p.usuario_id = u.id
-           LEFT JOIN tarjetas_credito t ON p.tarjeta_id = t.id
-           LEFT JOIN cuentas_bancarias cb ON p.cuenta_id = cb.id
-           LEFT JOIN clientes c ON p.cliente_asociado_id = c.id
-           WHERE p.id = $1`,
-          [id]
-        );
-        return result.rows[0] || null;
-      }
-
-      let sql = `SELECT p.*, 
-                        pr.nombre as proveedor_nombre,
-                        u.nombre_usuario as usuario_nombre,
-                        t.titular as tarjeta_titular,
-                        cb.nombre_banco as cuenta_banco
-                 FROM pagos p
-                 LEFT JOIN proveedores pr ON p.proveedor_id = pr.id
-                 LEFT JOIN usuarios u ON p.usuario_id = u.id
-                 LEFT JOIN tarjetas_credito t ON p.tarjeta_id = t.id
-                 LEFT JOIN cuentas_bancarias cb ON p.cuenta_id = cb.id
-                 WHERE 1=1`;
+      let result;
       
-      const params: any[] = [];
-      let paramCount = 1;
-
-      if (filters?.proveedor_id) {
-        sql += ` AND p.proveedor_id = $${paramCount++}`;
-        params.push(filters.proveedor_id);
-      }
-      if (filters?.estado) {
-        sql += ` AND p.estado = $${paramCount++}`;
-        params.push(filters.estado);
-      }
-      if (filters?.fecha_desde) {
-        sql += ` AND p.fecha_creacion >= $${paramCount++}`;
-        params.push(filters.fecha_desde);
-      }
-      if (filters?.fecha_hasta) {
-        sql += ` AND p.fecha_creacion <= $${paramCount++}`;
-        params.push(filters.fecha_hasta);
+      if (id) {
+        // Obtener un pago específico
+        result = await query('SELECT pagos_get($1) as response', [id]);
+      } else {
+        // Obtener todos los pagos
+        result = await query('SELECT pagos_get() as response');
       }
 
-      sql += ` ORDER BY p.fecha_creacion DESC LIMIT 100`;
+      const response: PostgreSQLResponse = result.rows[0].response;
+      
+      // Si hubo error en la función PostgreSQL, lanzar excepción
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
+      }
 
-      const result = await query(sql, params);
-      return result.rows;
-    } catch (error) {
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al obtener pagos:', error);
       throw error;
     }
   }
 
+  /**
+   * POST: Crear un nuevo pago
+   * Usa la función PostgreSQL: pagos_post(...)
+   * 
+   * Esta función:
+   * - Valida proveedor, usuario, tarjeta/cuenta
+   * - Descuenta saldo de tarjeta (si aplica)
+   * - Vincula clientes
+   * - Retorna el pago completo con todas las relaciones
+   */
   async createPago(data: {
-    monto: number;
-    moneda: string;
-    medio_pago: string;
     proveedor_id: number;
     usuario_id: number;
+    codigo_reserva: string;
+    monto: number;
+    moneda: 'USD' | 'CAD';
+    tipo_medio_pago: 'TARJETA' | 'CUENTA_BANCARIA';
     tarjeta_id?: number | null;
-    cuenta_id?: number | null;
-    observaciones?: string | null;
-    cliente_asociado_id?: number | null;
+    cuenta_bancaria_id?: number | null;
+    clientes_ids?: number[] | null;
+    descripcion?: string | null;
+    fecha_esperada_debito?: string | null;
   }) {
-    const client = await getClient();
     try {
-      await client.query('BEGIN');
+      // Convertir clientes_ids a formato PostgreSQL array
+      const clientesArray = data.clientes_ids && data.clientes_ids.length > 0
+        ? `{${data.clientes_ids.join(',')}}`
+        : null;
 
-      // Validaciones
-      const proveedor = await client.query('SELECT id FROM proveedores WHERE id = $1', [data.proveedor_id]);
-      if (proveedor.rows.length === 0) throw new Error('Proveedor no encontrado');
-
-      const usuario = await client.query('SELECT id FROM usuarios WHERE id = $1', [data.usuario_id]);
-      if (usuario.rows.length === 0) throw new Error('Usuario no encontrado');
-
-      // Si es pago con tarjeta, validar y descontar saldo
-      if (data.tarjeta_id) {
-        const tarjeta = await client.query('SELECT * FROM tarjetas_credito WHERE id = $1', [data.tarjeta_id]);
-        if (tarjeta.rows.length === 0) throw new Error('Tarjeta no encontrada');
-        
-        if (parseFloat(tarjeta.rows[0].saldo_disponible) < data.monto) {
-          throw new Error('Saldo insuficiente en la tarjeta');
-        }
-
-        // Descontar saldo
-        await client.query(
-          'UPDATE tarjetas_credito SET saldo_disponible = saldo_disponible - $1 WHERE id = $2',
-          [data.monto, data.tarjeta_id]
-        );
-      }
-
-      // Si cuenta bancaria, validar que existe
-      if (data.cuenta_id) {
-        const cuenta = await client.query('SELECT id FROM cuentas_bancarias WHERE id = $1', [data.cuenta_id]);
-        if (cuenta.rows.length === 0) throw new Error('Cuenta bancaria no encontrada');
-      }
-
-      // Crear pago
-      const result = await client.query(
-        `INSERT INTO pagos (monto, moneda, medio_pago, proveedor_id, usuario_id, tarjeta_id, cuenta_id, 
-                            observaciones, cliente_asociado_id, estado, fecha_creacion)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDIENTE', CURRENT_TIMESTAMP) RETURNING *`,
-        [data.monto, data.moneda, data.medio_pago, data.proveedor_id, data.usuario_id,
-         data.tarjeta_id || null, data.cuenta_id || null, data.observaciones || null, data.cliente_asociado_id || null]
+      const result = await query(
+        `SELECT pagos_post(
+          $1,  -- proveedor_id
+          $2,  -- usuario_id
+          $3,  -- codigo_reserva
+          $4,  -- monto
+          $5::tipo_moneda,  -- moneda
+          $6::tipo_medio_pago,  -- tipo_medio_pago
+          $7,  -- tarjeta_id
+          $8,  -- cuenta_bancaria_id
+          $9::BIGINT[],  -- clientes_ids
+          $10,  -- descripcion
+          $11  -- fecha_esperada_debito
+        ) as response`,
+        [
+          data.proveedor_id,
+          data.usuario_id,
+          data.codigo_reserva,
+          data.monto,
+          data.moneda,
+          data.tipo_medio_pago,
+          data.tarjeta_id || null,
+          data.cuenta_bancaria_id || null,
+          clientesArray,
+          data.descripcion || null,
+          data.fecha_esperada_debito || null
+        ]
       );
 
-      await client.query('COMMIT');
-      logger.info(`Pago creado: ID ${result.rows[0].id} - Monto: ${data.monto} ${data.moneda}`);
+      const response: PostgreSQLResponse = result.rows[0].response;
+
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        error.data = response.data; // Para incluir saldo_disponible en errores
+        throw error;
+      }
+
+      logger.info(`Pago creado: ${data.codigo_reserva} - Monto: ${data.monto} ${data.moneda}`);
       
-      return await this.getPagos(result.rows[0].id);
-    } catch (error) {
-      await client.query('ROLLBACK');
+      // Enviar datos del pago al webhook de N8N (no bloquear si falla)
+      try {
+        const { n8nClient } = await import('../utils/n8n.util');
+        const webhookResult = await n8nClient.notificarPagoWebhook(response.data, 'CREAR');
+        
+        if (webhookResult.success) {
+          logger.info(`Pago ${response.data.id} enviado al webhook N8N exitosamente`);
+        } else {
+          logger.warn(`Pago ${response.data.id} creado pero falló envío a webhook N8N: ${webhookResult.error}`);
+        }
+      } catch (webhookError: any) {
+        // No fallar la operación si el webhook falla
+        logger.error(`Error al notificar pago al webhook N8N:`, webhookError.message);
+      }
+      
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al crear pago:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
-  async updatePago(id: number, data: { estado?: string; observaciones?: string | null; fecha_pago?: string | null }) {
-    const client = await getClient();
+  /**
+   * PUT: Actualizar un pago existente
+   * Usa la función PostgreSQL: pagos_put(...)
+   * 
+   * Validaciones de la función PostgreSQL:
+   * - No se puede editar un pago verificado
+   * - No se puede cambiar el monto si es con tarjeta (ya se descontó)
+   * - Si se marca verificado=true, automáticamente marca pagado=true
+   */
+  async updatePago(id: number, data: {
+    monto?: number;
+    descripcion?: string | null;
+    fecha_esperada_debito?: string | null;
+    pagado?: boolean;
+    verificado?: boolean;
+    gmail_enviado?: boolean;
+    activo?: boolean;
+  }) {
     try {
-      await client.query('BEGIN');
+      const result = await query(
+        `SELECT pagos_put(
+          $1,  -- id
+          $2,  -- monto
+          $3,  -- descripcion
+          $4,  -- fecha_esperada_debito
+          $5,  -- pagado
+          $6,  -- verificado
+          $7,  -- gmail_enviado
+          $8   -- activo
+        ) as response`,
+        [
+          id,
+          data.monto !== undefined ? data.monto : null,
+          data.descripcion !== undefined ? data.descripcion : null,
+          data.fecha_esperada_debito !== undefined ? data.fecha_esperada_debito : null,
+          data.pagado !== undefined ? data.pagado : null,
+          data.verificado !== undefined ? data.verificado : null,
+          data.gmail_enviado !== undefined ? data.gmail_enviado : null,
+          data.activo !== undefined ? data.activo : null
+        ]
+      );
 
-      const existing = await client.query('SELECT * FROM pagos WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Pago no encontrado');
+      const response: PostgreSQLResponse = result.rows[0].response;
 
-      // Si se cancela un pago con tarjeta, devolver el saldo
-      if (data.estado === 'CANCELADO' && existing.rows[0].estado !== 'CANCELADO' && existing.rows[0].tarjeta_id) {
-        await client.query(
-          'UPDATE tarjetas_credito SET saldo_disponible = saldo_disponible + $1 WHERE id = $2',
-          [existing.rows[0].monto, existing.rows[0].tarjeta_id]
-        );
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      const updates: string[] = [];
-      const values: any[] = [];
-      let paramCount = 1;
-
-      if (data.estado !== undefined) { updates.push(`estado = $${paramCount++}`); values.push(data.estado); }
-      if (data.observaciones !== undefined) { updates.push(`observaciones = $${paramCount++}`); values.push(data.observaciones); }
-      if (data.fecha_pago !== undefined) { updates.push(`fecha_pago = $${paramCount++}`); values.push(data.fecha_pago); }
-
-      if (updates.length === 0) {
-        await client.query('COMMIT');
-        return existing.rows[0];
-      }
-
-      values.push(id);
-      await client.query(`UPDATE pagos SET ${updates.join(', ')} WHERE id = $${paramCount}`, values);
-
-      await client.query('COMMIT');
       logger.info(`Pago actualizado: ID ${id}`);
       
-      return await this.getPagos(id);
-    } catch (error) {
-      await client.query('ROLLBACK');
+      // Enviar datos del pago actualizado al webhook de N8N
+      try {
+        const { n8nClient } = await import('../utils/n8n.util');
+        const webhookResult = await n8nClient.notificarPagoWebhook(response.data, 'ACTUALIZAR');
+        
+        if (webhookResult.success) {
+          logger.info(`Pago ${id} actualizado enviado al webhook N8N`);
+        } else {
+          logger.warn(`Pago ${id} actualizado pero falló envío a webhook N8N: ${webhookResult.error}`);
+        }
+      } catch (webhookError: any) {
+        logger.error(`Error al notificar actualización al webhook N8N:`, webhookError.message);
+      }
+      
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al actualizar pago:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
+  /**
+   * DELETE: Eliminar un pago
+   * Usa la función PostgreSQL: pagos_delete(p_id)
+   * 
+   * Validaciones de la función PostgreSQL:
+   * - No se puede eliminar si gmail_enviado = true
+   * - Si es pago con tarjeta, DEVUELVE el monto al saldo
+   * - Elimina relaciones con clientes
+   */
   async deletePago(id: number) {
-    const client = await getClient();
     try {
-      await client.query('BEGIN');
+      const result = await query(
+        'SELECT pagos_delete($1) as response',
+        [id]
+      );
 
-      const existing = await client.query('SELECT * FROM pagos WHERE id = $1', [id]);
-      if (existing.rows.length === 0) throw new Error('Pago no encontrado');
+      const response: PostgreSQLResponse = result.rows[0].response;
 
-      if (existing.rows[0].estado === 'COMPLETADO') {
-        throw new Error('No se puede eliminar un pago completado');
+      if (!response.estado) {
+        const error = new Error(response.message) as any;
+        error.code = response.code;
+        throw error;
       }
 
-      // Si tiene tarjeta, devolver saldo
-      if (existing.rows[0].tarjeta_id && existing.rows[0].estado !== 'CANCELADO') {
-        await client.query(
-          'UPDATE tarjetas_credito SET saldo_disponible = saldo_disponible + $1 WHERE id = $2',
-          [existing.rows[0].monto, existing.rows[0].tarjeta_id]
-        );
-      }
-
-      await client.query('UPDATE pagos SET estado = $1 WHERE id = $2', ['CANCELADO', id]);
-
-      await client.query('COMMIT');
-      logger.info(`Pago cancelado: ID ${id}`);
+      logger.info(`Pago eliminado: ${response.data?.codigo_reserva} - Monto devuelto: ${response.data?.monto_devuelto || 0}`);
       
-      return existing.rows[0];
-    } catch (error) {
-      await client.query('ROLLBACK');
+      // Enviar notificación de eliminación al webhook de N8N
+      try {
+        const { n8nClient } = await import('../utils/n8n.util');
+        const webhookResult = await n8nClient.notificarPagoWebhook({
+          id: id,
+          ...response.data
+        }, 'ELIMINAR');
+        
+        if (webhookResult.success) {
+          logger.info(`Eliminación de pago ${id} enviada al webhook N8N`);
+        } else {
+          logger.warn(`Pago ${id} eliminado pero falló envío a webhook N8N: ${webhookResult.error}`);
+        }
+      } catch (webhookError: any) {
+        logger.error(`Error al notificar eliminación al webhook N8N:`, webhookError.message);
+      }
+      
+      return response.data;
+    } catch (error: any) {
       logger.error('Error al eliminar pago:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 }

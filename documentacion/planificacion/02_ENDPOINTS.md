@@ -35,7 +35,7 @@ Iniciar sesión
 
 ```json
 {
-  "username": "admin@terracanada.com",
+  "username": "@adminterracanada.com",
   "password": "password123"
 }
 ```
