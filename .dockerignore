@@ -1,60 +1,81 @@
+# ================================
+# ARCHIVOS Y DIRECTORIOS A IGNORAR
+# ================================
+
 # Dependencias
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Build
-dist/
-build/
-*.tsbuildinfo
-
-# Archivos de entorno (NO incluir en imagen)
+# Archivos de entorno
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Logs
 logs/
 *.log
 
-# Sistema operativo
-.DS_Store
-Thumbs.db
+# Archivos de desarrollo
+src/
+tests/
+*.test.ts
+*.spec.ts
 
-# IDE
+# TypeScript
+*.tsbuildinfo
+tsconfig.json
+tsconfig.*.json
+
+# IDE y editores
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
 
 # Git
 .git/
 .gitignore
+.gitattributes
 
-# Testing
-coverage/
-.nyc_output/
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
 
-# Prisma (ya eliminado pero por si acaso)
-prisma/migrations/
-src/generated/
-
-# Documentación de desarrollo
+# Documentación
+README.md
+CHANGELOG.md
+LICENSE
 *.md
-!README.md
-planificacion/
-DOCUMENTACION_ENDPOINTS.md
-POSTGRESQL_LOCAL_SETUP.md
-CONFIGURACION_COMPLETADA.md
+documentacion/
+
+# Scripts de desarrollo
+*.ps1
+*.sh
 
 # Archivos temporales
 tmp/
 temp/
 *.tmp
 
-# Docker
-.dockerignore
-docker-compose*.yml
-Dockerfile*
+# Uploads locales (se crean en el contenedor)
+uploads/
+
+# Coverage y tests
+coverage/
+.nyc_output/
+
+# Build artifacts (se copian desde builder stage)
+dist/
+
+# Otros
+.prettierrc
+.eslintrc*
+.editorconfig
+nodemon.json
