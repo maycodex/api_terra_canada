@@ -20,15 +20,12 @@ logs/
 *.log
 
 # Archivos de desarrollo
-src/
 tests/
 *.test.ts
 *.spec.ts
 
 # TypeScript
 *.tsbuildinfo
-tsconfig.json
-tsconfig.*.json
 
 # IDE y editores
 .vscode/
