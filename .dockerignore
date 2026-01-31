@@ -10,10 +10,28 @@ npm-debug.log*
 logs/
 *.log
 
+<<<<<<< HEAD
 # Archivos temporales
 tmp/
 temp/
 uploads/
+=======
+# Archivos de desarrollo
+tests/
+*.test.ts
+*.spec.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+>>>>>>> d8c151b955deb67458ff66a046366ddfff818eb8
 
 # Git
 .git/
